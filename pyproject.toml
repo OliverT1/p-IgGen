@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "p-IgGen"
+version = "1.0.0"
+description = "A generative paired antibody language model."
+authors = [
+    { name = "Oliver Turnbull", email = "oturnbull1@gmail.com" }
+]
+readme = "README.md"
+dependencies = [
+    "transformers",
+    "torch",
+    "click"
+]
+requires-python = ">=3.6"
+
+[project.urls]
+"Homepage" = "https://github.com/olivert1/p-iggen"
+"Repository" = "https://github.com/olivert1/p-iggen"
+
+[project.scripts]
+piggen_generate = "piggen.cli:generate"
+piggen_likelihood = "piggen.cli:likelihood"
