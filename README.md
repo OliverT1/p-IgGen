@@ -23,13 +23,13 @@ We advise installing using a conda environment.
      ```sh
     conda create -n my_env
     conda activate my_env
-    conda install python pip -y
+    conda install python=3.11 pip -y
     ```
 
 2. **Install this repository**:
 
     ```sh
-    pip install https://github.com/OliverT1/p-IgGen.git
+    pip install git+https://github.com/OliverT1/p-IgGen.git
     ```
 
 
