@@ -89,7 +89,7 @@ class pIgGen:
         batch_size=1,
         prompt: Optional[str] = None,
         discard_bottom_n_percent=None,
-        seperated_output=False,
+        separated_output=False,
     ) -> List[str]:
 
         if backwards:
@@ -148,8 +148,8 @@ class pIgGen:
             decoded_sequences = [x[0] for x in decoded_sequences[:n_samples]]
 
         logger.info(f"Generated {len(decoded_sequences)} sequences with temp {temp}.")
-        if seperated_output:
-            VH, VL = utils.get_seperate_VH_VL(decoded_sequences)
+        if separated_output:
+            VH, VL = utils.get_separate_VH_VL(decoded_sequences)
             return VH, VL
         return decoded_sequences
 
