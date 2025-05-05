@@ -1,11 +1,8 @@
-from typing import List
-
-
 def format_and_validate_output(generated_sequence: str) -> str:
     """
     Formats the output of a generated sequence. This involves terminating the sequence
-    after either '1' or '2' token, removing the start and end tokens, and reversing the order
-    if the sequence is backwards.
+    after either '1' or '2' token, removing the start and end tokens,
+    and reversing the order if the sequence is backwards.
     """
 
     if not (generated_sequence[0] == "1" or generated_sequence[0] == "2"):
@@ -32,16 +29,19 @@ def format_and_validate_output(generated_sequence: str) -> str:
     return generated_sequence
 
 
-def get_seperate_VH_VL(sequences: List[str]):
+def get_separate_VH_VL(sequences: list[str]):
     """
     Uses anarci to seperate a list of sequences into VH and VL
     """
     try:
         import anarci
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
-            "ANARCI is required to run this function. Please install it using the instructions in the README."
-        )
+            """
+            ANARCI is required to run this function.
+            Please install it using the instructions in the README.
+            """
+        ) from e
 
     # get into right format for anarci
     VH = []
@@ -49,13 +49,18 @@ def get_seperate_VH_VL(sequences: List[str]):
     sequences = [("dummy", sequence) for sequence in sequences]  # type: ignore
     numbering, alignment_details, hit_tables = anarci.anarci(sequences)
     # get the VH and VL sequences
-    for sequence in numbering:
-        VH.append(anarci_numbered_to_seq(sequence[0][0]))
-        VL.append(anarci_numbered_to_seq(sequence[1][0]))
+    try:
+        for sequence in numbering:
+            VH.append(anarci_numbered_to_seq(sequence[0][0]))
+            VL.append(anarci_numbered_to_seq(sequence[1][0]))
+    except IndexError:
+        print("Error running ANARCI.")
+        return None, None
+
     return VH, VL
 
 
-def anarci_numbered_to_seq(numbered_sequence: List):
+def anarci_numbered_to_seq(numbered_sequence: list):
     """
     Takes in a numbered sequence from anarci and returns the sequence as a string
     """

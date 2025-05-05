@@ -1,11 +1,14 @@
+from __future__ import annotations
+
+import logging
+import math
+from typing import Literal
+
+import torch
 import transformers
 from transformers import GenerationConfig
-from typing import Literal, Optional, List
-import torch
-import math
+
 from piggen import utils
-import numpy as np
-import logging
 
 log_format = "%(asctime)s - %(levelname)s - %(message)s"
 date_format = "%H:%M:%S"
@@ -31,7 +34,14 @@ class pIgGen:
         self.model.eval()
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(model_name)
         if device is None:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            if torch.cuda.is_available():
+                self.device = "cuda"
+            elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+                # Check if MPS is both available and built
+                self.device = "mps"
+            else:
+                self.device = "cpu"
+            logger.info(f"No device specified, automatically selected {self.device}.")
         else:
             self.device = device
         self.model.to(self.device)
@@ -87,10 +97,10 @@ class pIgGen:
         top_p=0.95,
         temp=1.25,
         batch_size=1,
-        prompt: Optional[str] = None,
+        prompt: str | None = None,
         discard_bottom_n_percent=None,
         separated_output=False,
-    ) -> List[str]:
+    ) -> list[str]:
 
         if backwards:
             if prompt is None:
@@ -103,7 +113,10 @@ class pIgGen:
 
         if discard_bottom_n_percent is not None and num_return_sequences < 100:
             logger.warning(
-                "Cannot discard bottom n percent with less than 100 sequences. Ignoring discard_bottom_n_percent."
+                """
+                Cannot discard bottom n percent with less than 100 sequences.
+                Ignoring discard_bottom_n_percent.
+                """
             )
             discard_bottom_n_percent = None
 
@@ -142,9 +155,6 @@ class pIgGen:
                 decoded_sequences, key=lambda x: x[1], reverse=True
             )
             decoded_sequences = decoded_sequences[:n_samples]
-            mean_likelihood_after_filtering = np.mean(
-                [x[1] for x in decoded_sequences[:num_return_sequences]]
-            )
             decoded_sequences = [x[0] for x in decoded_sequences[:n_samples]]
 
         logger.info(f"Generated {len(decoded_sequences)} sequences with temp {temp}.")
@@ -160,29 +170,30 @@ class pIgGen:
         top_p=0.95,
         temp=1.25,
         batch_size=1,
-    ) -> List[str]:
+    ) -> list[str]:
         """
-        Given a heavy chain sequence, generate a light chain sequence.
+        Given a light chain sequence, generate a heavy chain sequence.
+        Will genreate in reverse direction.
 
         Args:
-            light_chain (str): The heavy chain sequence.
-            num_return_sequences (int): The number of light chain sequences to generate.
-            top_p (float, optional): The cumulative probability for nucleus sampling. Defaults to 0.95.
-            temp (float, optional): The temperature value for sampling. Defaults to 1.25.
+            light_chain (str): The light chain sequence.
+            num_return_sequences (int): The number of heavy chain sequences to generate.
+            top_p (float, optional): The cumulative probability for nucleus sampling.
+                Defaults to 0.95.
+            temp (float, optional): The temperature value for sampling. Defaults to 1.25
             batch_size (int, optional): The batch size for generation. Defaults to 1.
 
         Returns:
-            List[str]: A list of generated light chain sequences.
+            List[str]: A list of generated heavy chain sequences.
 
         """
         # generate backwards
         prompt = f"2{light_chain[::-1]}"
         return self.generate(
             num_return_sequences,
-            backwards,
-            top_p,
-            temp,
-            batch_size,
+            top_p=top_p,
+            temp=temp,
+            batch_size=batch_size,
             backwards=True,
             prompt=prompt,
         )
@@ -191,36 +202,36 @@ class pIgGen:
         self,
         heavy_chain: str,
         num_return_sequences: int,
-        backwards=False,
         top_p=0.95,
         temp=1.25,
         batch_size=1,
-    ) -> List[str]:
+    ) -> list[str]:
         """
-        Given a light chain sequence, generate a heavy chain sequence.
+        Given a heavy chain sequence, generates a light chain sequence.
         """
         # Generate forwards
         prompt = f"1{heavy_chain}"
         return self.generate(
             num_return_sequences,
-            backwards,
-            top_p,
-            temp,
-            batch_size,
+            backwards=False,
+            top_p=top_p,
+            temp=temp,
+            batch_size=batch_size,
             prompt=prompt,
         )
 
     def get_batch_log_likelihoods(
-        self, sequences: List[str], batch_size: int = 32
-    ) -> List[float]:
+        self, sequences: list[str], batch_size: int = 32
+    ) -> list[float]:
         """
-        Computes the log likelihood for a batch of sequences. Ensures not caculated for padding tokens and the beggining and start
+        Computes the log likelihood for a batch of sequences.
+        Ensures not caculated for padding tokens and the beggining and start
         tokens.
 
         Args:
-            sequences (List[str]): A list of sequences for which to compute the likelihood.
+            sequences (List[str]): A list of sequences
+                for which to compute the likelihood.
             batch_size (int): The size of each batch for processing.
-            device (str): The device to use for computation. Default is 'cuda'.
         Returns:
             likelihoods (List[float]): A list of log likelihoods for each sequence.
         """
@@ -258,7 +269,8 @@ class pIgGen:
                 mask = torch.ones(shift_labels.shape, dtype=torch.bool).to(self.device)
                 for token_id in special_token_ids:
                     mask = mask & (shift_labels != token_id)
-                # Compute the negative log-likelihood using cross_entropy, ignoring masked tokens
+                # Compute the negative log-likelihood using cross_entropy,
+                # ignoring masked tokens
                 nll = torch.nn.functional.cross_entropy(
                     shift_logits.view(-1, shift_logits.size(-1))[mask],
                     shift_labels.view(-1)[mask],
